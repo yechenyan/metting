@@ -1,5 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+export function fileDisposition(kind: "attachment" | "inline", name: string) {
+  const fallback = name.replace(/[^a-z0-9._ -]/gi, "_");
+  const encoded = encodeURIComponent(name).replace(
+    /['()*]/g,
+    (char) => "%" + char.charCodeAt(0).toString(16).toUpperCase(),
+  );
+  return kind + '; filename="' + fallback + "\"; filename*=UTF-8''" + encoded;
+}
+
 export function json(res: ServerResponse, value: unknown, status = 200) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",

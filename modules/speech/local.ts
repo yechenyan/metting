@@ -57,7 +57,13 @@ export class LocalSpeech {
   private failure: Notice | null = null;
   private fence?: NodeJS.Timeout;
   constructor(private c: SpeechCallbacks) {}
-  prepare(settings: Settings, directory: string, offset: number) {
+  prepare(
+    settings: Settings,
+    directory: string,
+    offset: number,
+    stateDirectory = directory,
+    recordingName = "Recording",
+  ) {
     const worker = (this.worker = spawn(
       speechPython,
       [
@@ -66,9 +72,11 @@ export class LocalSpeech {
         "--models",
         join(cacheDir, "models"),
         "--profile",
-        join(directory, "voices.json"),
+        join(stateDirectory, "voices.json"),
         "--audio-dir",
         join(directory, "audio"),
+        "--recording-name",
+        recordingName,
         "--language",
         settings.language,
         "--offset",

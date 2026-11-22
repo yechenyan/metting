@@ -3,10 +3,12 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   truncateSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
+import { recordingStem } from "../meetings/names.ts";
 import { emptyUsage, type Usage } from "../agent-runtime/types.ts";
 import {
   chronological,
@@ -36,8 +38,19 @@ export class Journal {
   readonly speakerNames = new SpeakerNames();
   readonly names = this.speakerNames.legacy;
   readonly listeners = new Set<(p: Packet) => void>();
-  readonly path: string;
-  readonly markdown: string;
+  private initialStem: string;
+  get directory() {
+    return this.location?.directory() ?? this.initialDirectory;
+  }
+  get stem() {
+    return this.location?.stem() ?? this.initialStem;
+  }
+  get path() {
+    return join(this.directory, this.stem + ".jsonl");
+  }
+  get markdown() {
+    return join(this.directory, this.stem + ".md");
+  }
   state: RunState = "idle";
   notice: Notice | null = null;
   aiStatus = "idle";
@@ -58,12 +71,31 @@ export class Journal {
   private diskFailed = false;
 
   constructor(
-    public directory: string,
+    private initialDirectory: string,
     private getTarget?: () => TranslationTarget,
+    private location?: {
+      directory(): string;
+      stem(): string;
+      hold(): () => void;
+    },
   ) {
+    const directory = this.directory;
     mkdirSync(directory, { recursive: true });
-    this.path = join(directory, "transcript.jsonl");
-    this.markdown = join(directory, "transcript.md");
+    const named = recordingStem(
+      basename(dirname(directory)),
+      basename(directory),
+    );
+    this.initialStem =
+      !location && existsSync(join(directory, named + ".jsonl"))
+        ? named
+        : "transcript";
+    if (location) {
+      for (const ext of [".jsonl", ".md"]) {
+        const old = join(directory, "transcript" + ext);
+        const file = join(directory, this.stem + ext);
+        if (!existsSync(file) && existsSync(old)) renameSync(old, file);
+      }
+    }
     if (!existsSync(this.path)) writeFileSync(this.path, "", { mode: 0o600 });
     const bytes = readFileSync(this.path);
     const end = bytes.lastIndexOf(10) + 1;
@@ -265,11 +297,14 @@ export class Journal {
     this.partialTimer = undefined;
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
-    if (!this.writing && this.queue.length)
+    if (!this.writing && this.queue.length) {
+      const release = this.location?.hold();
       this.writing = this.writeQueued().finally(() => {
         this.writing = undefined;
         if (this.queue.length) this.schedule();
+        release?.();
       });
+    }
     await this.writing;
   }
   private async writeQueued() {
@@ -336,7 +371,14 @@ export class Journal {
   export() {
     this.exporting = this.exporting
       .catch(() => {})
-      .then(() => this.writeMarkdown());
+      .then(async () => {
+        const release = this.location?.hold();
+        try {
+          await this.writeMarkdown();
+        } finally {
+          release?.();
+        }
+      });
     return this.exporting;
   }
   private async writeMarkdown() {
@@ -400,8 +442,17 @@ export class Journal {
         lines.push("");
       }
     }
-    const tmp = this.markdown + "." + crypto.randomUUID() + ".tmp";
-    await fs.writeFile(tmp, lines.join("\n"), { mode: 0o600 });
-    await fs.rename(tmp, this.markdown);
+    const output = this.markdown;
+    const tmp = join(
+      dirname(output),
+      "." + basename(output) + "." + crypto.randomUUID() + ".tmp",
+    );
+    try {
+      await fs.writeFile(tmp, lines.join("\n"), { mode: 0o600, flag: "wx" });
+      await fs.rename(tmp, output);
+    } catch (error) {
+      await fs.rm(tmp, { force: true });
+      throw error;
+    }
   }
 }

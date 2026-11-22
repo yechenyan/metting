@@ -305,6 +305,27 @@ select {
   color: #334339;
   font-weight: 550;
 }
+.recording-row {
+  display: flex;
+  align-items: center;
+}
+.recording-row .recording-item {
+  min-width: 0;
+  flex: 1;
+}
+.recording-item svg, .recording-dot { flex: none; }
+.recording-label {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.rename-recording {
+  padding: 4px;
+  color: var(--muted);
+}
+@media (hover: hover) {
+  .recording-row:not(:hover):not(:focus-within) .rename-recording { opacity: 0; }
+}
 .recording-dot {
   margin-left: auto;
   width: 5px;
@@ -378,8 +399,9 @@ select {
   cursor: pointer;
 }
 .desk-path select {
-  flex: none;
-  max-width: 90px;
+  min-width: 0;
+  max-width: 48%;
+  text-overflow: ellipsis;
 }
 .desk-path select:hover,
 .capture-lang select:enabled:hover {
@@ -1101,6 +1123,7 @@ select,
   color: var(--muted);
   line-height: 1.5;
 }
+.project-folder-field .storage-path { display: block; overflow-wrap: anywhere; }
 .form footer {
   display: flex;
   justify-content: flex-end;

@@ -46,7 +46,7 @@ class InputSelectionTests(unittest.TestCase):
                 row, audio = submit.call_args.args
                 self.assertEqual(audio, frames[source_id] * 24)
                 take, = Path(directory).glob("*.wav")
-                self.assertTrue(take.name.startswith("000000003400-"))
+                self.assertEqual(take.name, "Recording - 00h00m03.400s.wav")
                 self.assertEqual(saved_pcm(take), audio)
                 self.assertEqual([args[0][0] for args in decoder.AcceptWaveform.call_args_list],
                                  [frames[source_id]] * 24)
@@ -95,6 +95,16 @@ class InputSelectionTests(unittest.TestCase):
             self.assertEqual(len(takes), 2)
             self.assertEqual(saved_pcm(takes[0]), expected)
             self.assertEqual(saved_pcm(takes[1]), packet)
+
+    def test_duplicate_start_times_preserve_both_named_takes(self):
+        with TemporaryDirectory() as directory:
+            for sample in (b"\x01\x00", b"\x02\x00"):
+                writer = RecordingWriter(directory, self.fail, "Review - Discussion")
+                writer.write(1234, sample)
+                writer.close()
+            stem = "Review - Discussion - 00h00m01.234s"
+            self.assertEqual(saved_pcm(Path(directory) / (stem + ".wav")), b"\x01\x00")
+            self.assertEqual(saved_pcm(Path(directory) / (stem + " (2).wav")), b"\x02\x00")
 
     def test_an_archive_error_is_reported_once_and_does_not_block_capture(self):
         with TemporaryDirectory() as directory:

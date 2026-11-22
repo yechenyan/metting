@@ -22,10 +22,14 @@ function remainingTime(project: Project, journal: Journal) {
 }
 
 export class Meetings {
-  private records = new Map<string, { journal: Journal; audio: AudioPart[] }>();
+  private records = new Map<
+    string,
+    { journal: Journal; directory: string; audio: AudioPart[] }
+  >();
   private warm?: {
     id: string;
     language: Language;
+    directory: string;
     speech: SpeechSession;
   };
   private current?: {
@@ -34,6 +38,7 @@ export class Meetings {
     journal: Journal;
     speech: SpeechSession;
     limitReached: boolean;
+    release: () => void;
     timer?: NodeJS.Timeout;
   };
   constructor(
@@ -47,9 +52,17 @@ export class Meetings {
   get active() {
     return this.current?.id || null;
   }
-  private refreshAudio(record: { journal: Journal; audio: AudioPart[] }) {
+  private refreshAudio(record: {
+    journal: Journal;
+    directory: string;
+    audio: AudioPart[];
+  }) {
     try {
-      record.audio = readAudioParts(record.journal.directory);
+      record.audio = readAudioParts(
+        record.journal.directory,
+        record.journal.stem,
+      );
+      record.directory = record.journal.directory;
     } catch (error) {
       return { code: "audioStorageError", detail: String(error) };
     }
@@ -67,14 +80,22 @@ export class Meetings {
       const journal = new Journal(
         this.projects.directory(project, meeting),
         () => translationTarget(meeting.settings),
+        {
+          directory: () => this.projects.directory(project, meeting),
+          stem: () => this.projects.stem(project, meeting),
+          hold: () => this.projects.hold(project),
+        },
       );
-      record = { journal, audio: [] };
+      record = { journal, directory: journal.directory, audio: [] };
       const warning = this.refreshAudio(record);
       const end = this.audioEnd(record.audio);
       if (end > journal.time())
         journal.setState(journal.state, journal.notice, end);
       if (warning) journal.emit({ kind: "notice", notice: warning });
       this.records.set(id, record);
+    } else if (record.directory !== record.journal.directory) {
+      const warning = this.refreshAudio(record);
+      if (warning) record.journal.emit({ kind: "notice", notice: warning });
     }
     return record;
   }
@@ -89,7 +110,12 @@ export class Meetings {
     this.drafts?.prepare(meeting);
     if (this.current) return;
     const { language } = meeting.settings;
-    if (this.warm?.id === id && this.warm.language === language) return;
+    if (
+      this.warm?.id === id &&
+      this.warm.language === language &&
+      this.warm.directory === j.directory
+    )
+      return;
     this.warm?.speech.force();
     this.warm = undefined;
     const speech: SpeechSession | undefined = this.createSpeech(language, {
@@ -137,6 +163,11 @@ export class Meetings {
         if (!current || current.speech !== speech) return;
         this.drafts?.finishPartial(id);
         clearTimeout(current.timer);
+        try {
+          current.release();
+        } catch (error) {
+          failure ??= { code: "storageError", detail: String(error) };
+        }
         const record = this.record(id);
         const audioError = this.refreshAudio(record);
         let elapsed = Math.max(j.time(), this.audioEnd(record.audio));
@@ -170,8 +201,14 @@ export class Meetings {
       },
     });
     if (!speech) return;
-    this.warm = { id, language, speech };
-    speech.prepare(meeting.settings, j.directory, j.time());
+    this.warm = { id, language, speech, directory: j.directory };
+    speech.prepare(
+      meeting.settings,
+      j.directory,
+      j.time(),
+      this.projects.stateDirectory(project, meeting),
+      j.stem,
+    );
   }
   start(id: string) {
     if (this.current) throw new Error("A meeting is already recording");
@@ -186,7 +223,14 @@ export class Meetings {
       );
     const { speech } = this.warm;
     this.warm = undefined;
-    this.current = { id, project, journal: j, speech, limitReached: false };
+    this.current = {
+      id,
+      project,
+      journal: j,
+      speech,
+      limitReached: false,
+      release: this.projects.hold(project),
+    };
     this.activity(id);
     j.setState("preparing");
     try {

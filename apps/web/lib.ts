@@ -8,9 +8,6 @@ export interface Runtime {
 }
 import t from "./locales/zh-CN.json";
 export { t };
-export function recordingName(number: number) {
-  return t.meeting + " " + String(number).padStart(2, "0");
-}
 export async function api<T>(
   path: string,
   value?: unknown,

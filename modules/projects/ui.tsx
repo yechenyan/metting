@@ -12,8 +12,10 @@ import {
   Check,
   LoaderCircle,
   PanelLeftClose,
+  Pencil,
 } from "lucide-react";
-import { t, api, recordingName } from "../../apps/web/lib";
+import { t, api } from "../../apps/web/lib";
+import type { Meeting } from "../meetings/types";
 import { Modal } from "../../apps/web/Modal";
 import {
   defaultSourceLanguage,
@@ -40,6 +42,7 @@ function ProjectRecordings({
   active,
   choose,
   add,
+  rename,
   adding,
 }: {
   project: Project;
@@ -47,6 +50,7 @@ function ProjectRecordings({
   active: string | null;
   choose: (id: string) => void;
   add: (id: string) => void;
+  rename: (projectId: string, meeting: Meeting) => void;
   adding: boolean;
 }) {
   const [expanded, setExpanded] = useState(Boolean(selected));
@@ -86,15 +90,16 @@ function ProjectRecordings({
         hidden={!expanded}
       >
         {expanded &&
-          project.meetings.map((m, i) => (
-            <li key={m.id}>
+          project.meetings.map((m) => (
+            <li key={m.id} className="recording-row">
               <button
                 className="recording-item"
                 aria-current={m.id === selected ? "page" : undefined}
                 onClick={() => choose(m.id)}
+                title={m.name}
               >
                 <FileAudio size={13} />
-                {recordingName(project.meetings.length - i)}
+                <span className="recording-label">{m.name}</span>
                 {m.id === active && (
                   <span
                     className="recording-dot"
@@ -102,6 +107,14 @@ function ProjectRecordings({
                     aria-label={t.runStates.recording}
                   />
                 )}
+              </button>
+              <button
+                className="rename-recording"
+                title={t.renameRecording}
+                aria-label={t.renameRecording + " · " + m.name}
+                onClick={() => rename(project.id, m)}
+              >
+                <Pencil size={12} />
               </button>
             </li>
           ))}
@@ -118,6 +131,7 @@ export function Sidebar({
   choose,
   create,
   add,
+  rename,
   adding,
   pi,
   connect,
@@ -133,6 +147,7 @@ export function Sidebar({
   choose: (id: string) => void;
   create: () => void;
   add: (projectId: string) => void;
+  rename: (projectId: string, meeting: Meeting) => void;
   adding: boolean;
   pi: AgentInfo | null;
   connect: () => void;
@@ -221,6 +236,7 @@ export function Sidebar({
                 active={active}
                 choose={choose}
                 add={add}
+                rename={rename}
                 adding={adding}
               />
             ))}
@@ -256,11 +272,13 @@ function defaultName() {
 }
 export function ProjectForm({
   project,
+  defaultRecordingFolder,
   pi,
   close,
   saved,
 }: {
   project?: Project;
+  defaultRecordingFolder: string;
   pi: AgentInfo | null;
   close: () => void;
   saved: (p: Project) => void;
@@ -423,6 +441,14 @@ export function ProjectForm({
             )}
           </div>
           <small>{t.projectFolderHint}</small>
+          {!folder && defaultRecordingFolder && (
+            <small className="storage-path">
+              {t.defaultRecordingFolder.replace(
+                "{folder}",
+                defaultRecordingFolder,
+              )}
+            </small>
+          )}
         </div>
         <label>
           {t.defaultModel}

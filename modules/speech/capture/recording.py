@@ -4,7 +4,6 @@ import os
 import queue
 import struct
 import threading
-import uuid
 from pathlib import Path
 
 
@@ -13,10 +12,20 @@ MAX_FRAMES = (0xFFFFFFFF - 36) // 2
 
 
 class WaveTake:
-    def __init__(self, directory, start):
+    def __init__(self, directory, start, name):
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        path = directory / f"{start:012d}-{uuid.uuid4().hex}.wav"
-        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+        seconds, ms = divmod(start, 1000)
+        minutes, sec = divmod(seconds, 60)
+        hours, minute = divmod(minutes, 60)
+        stem = f"{name} - {hours:02d}h{minute:02d}m{sec:02d}.{ms:03d}s"
+        copy = 1
+        while True:
+            suffix = "" if copy == 1 else f" ({copy})"
+            try:
+                fd = os.open(directory / (stem + suffix + ".wav"), os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+                break
+            except FileExistsError:
+                copy += 1
         self.file = os.fdopen(fd, "w+b")
         self.start = start
         self.frames = self.checkpoint = 0
@@ -60,9 +69,10 @@ class WaveTake:
 
 
 class RecordingWriter:
-    def __init__(self, directory, on_error):
+    def __init__(self, directory, on_error, name="Recording"):
         self.directory = Path(directory)
         self.on_error = on_error
+        self.name = name
         self.packets = queue.Queue(maxsize=128)
         self.thread = None
         self.failed = False
@@ -85,7 +95,7 @@ class RecordingWriter:
                     take.close()
                     take = None
                 if take is None:
-                    take = WaveTake(self.directory, stamp)
+                    take = WaveTake(self.directory, stamp, self.name)
                     frame = 0
                 take.write(frame, pcm)
         except OSError as error:

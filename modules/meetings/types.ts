@@ -17,6 +17,10 @@ export interface Settings {
 }
 export interface Meeting {
   id: string;
+  name: string;
+  directoryName: string;
+  projectDirectoryName?: string;
+  pendingDirectoryName?: string;
   created: string;
   storageFolder: string;
   settings: Settings;

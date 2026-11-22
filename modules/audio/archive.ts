@@ -1,5 +1,6 @@
 import { readdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
+import { parseAudioFilename } from "./filenames.ts";
 import {
   framesPerMs,
   mergeRanges,
@@ -19,7 +20,7 @@ export interface AudioSlice {
   firstFrame: number;
   frames: number;
 }
-export function readAudioParts(directory: string): AudioPart[] {
+export function readAudioParts(directory: string, stem?: string): AudioPart[] {
   const path = join(directory, "audio");
   let entries;
   try {
@@ -30,16 +31,27 @@ export function readAudioParts(directory: string): AudioPart[] {
   }
   const parts: AudioPart[] = [];
   for (const entry of entries) {
-    const match = /^(\d{12,16})-[a-f0-9]{32}\.wav$/.exec(entry.name);
-    if (!match || !entry.isFile()) continue;
+    const match = parseAudioFilename(entry.name);
+    if (
+      !match ||
+      !entry.isFile() ||
+      (stem &&
+        match.stem &&
+        match.stem.normalize("NFC") !== stem.normalize("NFC"))
+    )
+      continue;
     const file = join(path, entry.name);
     // The payload length also recovers packets flushed before an interrupted header update.
     const frames = Math.floor((statSync(file).size - headerSize) / 2);
     if (frames > 0 && frames <= maxWaveFrames)
-      parts.push({ file, start: Number(match[1]), frames });
+      parts.push({ file, start: match.start, frames });
   }
   return parts.sort(
-    (a, b) => a.start - b.start || a.file.localeCompare(b.file),
+    (a, b) =>
+      a.start - b.start ||
+      parseAudioFilename(basename(a.file))!.copy -
+        parseAudioFilename(basename(b.file))!.copy ||
+      a.file.localeCompare(b.file),
   );
 }
 

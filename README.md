@@ -90,13 +90,15 @@ The React reader subscribes by segment ID and virtualizes older rows. Audio mete
 
 ## Files
 
-The registry is stored in the operating user's Application Support directory under `MeetingDesk`. Each new recording is stored under `MeetingDesk/<project-id>/meetings/<meeting-id>` in the folder linked at creation, or in the app's data directory when no folder is linked. Existing recordings keep their storage location when the project folder changes, including during capture or a streaming reply. Each session has the following files.
+The default recording folder on macOS is `Library/Application Support/MeetingDesk/projects` in the user's home folder. With a linked project folder, recordings live in its `MeetingDesk` subfolder. Inside either location, open the project name, then the recording name. The project form shows the configured default path. The recording menu can open its folder in Finder.
 
-- `transcript.jsonl` holds append-only caption events, versioned edits, speaker names, state and token usage. Reopening a meeting replays complete records and recovers interrupted drafts.
-- `transcript.md` follows the reading order and includes timestamped source quotations for merged turns. It is generated on stop and export, and refreshed when outstanding AI edits finish.
-- `audio/*.wav` holds the selected source, including silence, as 16 kHz mono 16-bit PCM. The capture worker writes the files in the background. Playback streams the saved takes in order and skips the time between stops and starts. Open the recording's local files from the menu to access the WAV files.
-- `voices.json` holds acoustic speaker profiles for resuming that meeting.
-- `chat.jsonl` stores the default conversation's questions, quotations, answers, per-turn token counts and recording checkpoints. `pi-session.jsonl` holds its native Pi session, including tool results. Additional conversations have their own files under `chats/<conversation-id>/`. The small `chats.json` index lists the recording's conversations. A service restart marks interrupted replies in the display history and resumes the native conversation on the next question.
+- `<project> - <recording>.jsonl` holds the live caption events, edits, speaker names, state and token usage.
+- `<project> - <recording>.md` is the readable transcript. It is generated on stop and export, and refreshed when outstanding AI edits finish.
+- `audio/<project> - <recording> - 00h00m00.000s.wav` contains the captured 16 kHz mono PCM. The timestamp is the take's starting position. Resuming adds another WAV, and the player plays the takes in order.
+
+Use the pencil beside a recording or the recording menu to rename it. Changing a project or recording name also renames its folders and files. An active capture or download finishes using its open files first. Duplicate names get a numeric suffix on disk. Changing the project's linked folder applies to new recordings. Existing recordings keep their original storage root. Legacy WAVs and transcripts are renamed in place on upgrade.
+
+The hidden `.meetingdesk` folder in each storage root keeps the recording's voice profiles, chat history, and native Pi sessions independently of its display name. Include it when backing up the storage root. The project registry stays in the application's data directory.
 
 Use `MEETING_DESK_DATA`, `MEETING_DESK_CACHE` or `MEETING_DESK_PORT` to override local locations or the listening port. `MEETING_DESK_CAPTURE` can select a compatible native helper for device integration or recorded-audio validation.
 

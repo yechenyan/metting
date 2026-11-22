@@ -20,6 +20,7 @@ function initialSidebar() {
 }
 function App() {
   const [projects, setProjects] = useState<Project[]>([]),
+    [defaultRecordingFolder, setDefaultRecordingFolder] = useState(""),
     [chatUrl, setChatUrl] = useState("/api/chat/"),
     [addingRecording, setAddingRecording] = useState(false),
     [active, setActive] = useState<string | null>(null),
@@ -37,11 +38,13 @@ function App() {
     try {
       const b = await api<{
         projects: Project[];
+        defaultRecordingFolder?: string;
         active: string | null;
         features?: { chat?: boolean };
       }>("bootstrap");
       if (version !== bootstrapVersion.current) return;
       setProjects(b.projects);
+      setDefaultRecordingFolder(b.defaultRecordingFolder || "");
       setChatUrl(chatEndpoint(b.features?.chat === true));
       setActive(b.active);
     } catch (e) {
@@ -180,6 +183,7 @@ function App() {
       )}
       {(modal === "new" || modal === "edit") && (
         <ProjectForm
+          defaultRecordingFolder={defaultRecordingFolder}
           project={modal === "edit" ? project : undefined}
           pi={runtime?.pi || null}
           close={() => setModal(null)}

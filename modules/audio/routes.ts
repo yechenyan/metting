@@ -2,7 +2,7 @@ import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { json, type Route } from "../../shared/http.ts";
+import { fileDisposition, json, type Route } from "../../shared/http.ts";
 import type { Segment } from "../transcripts/types.ts";
 import {
   audioManifest,
@@ -77,6 +77,7 @@ export async function audioRoute(
   { req, res, action }: Route,
   parts: AudioPart[],
   rows: ReadonlyMap<string, Segment>,
+  stem = "recording",
 ) {
   if (action === "audio-info") return json(res, audioManifest(parts));
   const params = new URL(req.url!, "http://localhost").searchParams;
@@ -105,7 +106,14 @@ export async function audioRoute(
     "Content-Length": end - start + 1,
     "Accept-Ranges": "bytes",
     "Cache-Control": "private, no-store",
-    "Content-Disposition": 'inline; filename="recording.wav"',
+    "Content-Disposition": fileDisposition(
+      "inline",
+      stem +
+        (params.get("volume")
+          ? " - " + (Number(params.get("volume")) + 1)
+          : "") +
+        ".wav",
+    ),
     ...(req.headers.range && {
       "Content-Range": `bytes ${start}-${end}/${size}`,
     }),

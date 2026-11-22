@@ -23,13 +23,24 @@ export async function projectRoute(
   if (req.method === "POST" && !id)
     return json(res, projects.create(await readObject(req)), 201);
   if (req.method === "POST" && action === "meetings") {
-    await readObject(req);
-    return json(res, projects.add(id), 201);
+    const value = await readObject(req);
+    const meeting = projects.add(id, value.name);
+    changed(projects.project(id), false);
+    return json(res, meeting, 201);
+  }
+  if (req.method === "PATCH" && action === "meetings") {
+    const value = await readObject(req);
+    const meeting = projects.renameRecording(id, value.id, value.name);
+    changed(projects.project(id), false);
+    return json(res, meeting);
   }
   if (req.method === "PATCH" && id && !action) {
     const value = await readObject(req);
-    const { folder: previousFolder, maxRecordingMinutes: previousLimit } =
-      projects.project(id);
+    const {
+      folder: previousFolder,
+      maxRecordingMinutes: previousLimit,
+      name: previousName,
+    } = projects.project(id);
     const project = projects.editProject(
       id,
       value.name,
@@ -38,7 +49,11 @@ export async function projectRoute(
       value.folder,
     );
     const limitChanged = project.maxRecordingMinutes !== previousLimit;
-    if (limitChanged || project.folder !== previousFolder)
+    if (
+      limitChanged ||
+      project.folder !== previousFolder ||
+      project.name !== previousName
+    )
       changed(project, limitChanged);
     return json(res, project);
   }

@@ -1,7 +1,14 @@
 import { createReadStream } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { json, readObject, unknown, type Route } from "../../shared/http.ts";
+import { pipeline } from "node:stream/promises";
+import {
+  fileDisposition,
+  json,
+  readObject,
+  unknown,
+  type Route,
+} from "../../shared/http.ts";
 import type { AgentHarness } from "../agent-runtime/types.ts";
 import { Meetings } from "./service.ts";
 import { audioRoute } from "../audio/routes.ts";
@@ -12,23 +19,39 @@ export async function meetingRoute(
   meetings: Meetings,
   harness: AgentHarness,
 ) {
-  const { meeting } = meetings.projects.find(id),
+  const { project, meeting } = meetings.projects.find(id),
     { journal: log, audio } = meetings.record(id);
   if (
     (req.method === "GET" || req.method === "HEAD") &&
     (action === "audio" || action === "audio-info")
-  )
-    return audioRoute({ req, res, id, action }, audio, log.rows);
+  ) {
+    const release = meetings.projects.hold(project);
+    try {
+      return await audioRoute(
+        { req, res, id, action },
+        audio,
+        log.rows,
+        log.stem,
+      );
+    } finally {
+      release();
+    }
+  }
   if (req.method === "GET" && !action) return json(res, log.snapshot());
   if (req.method === "GET" && action === "export") {
-    await log.export();
-    res.writeHead(200, {
-      "Content-Type": "text/markdown; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="transcript.md"',
-    });
-    createReadStream(log.markdown)
-      .on("error", (error) => res.destroy(error))
-      .pipe(res);
+    const release = meetings.projects.hold(project);
+    try {
+      await log.export();
+      res.writeHead(200, {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": fileDisposition("attachment", log.stem + ".md"),
+      });
+      await pipeline(createReadStream(log.markdown), res).catch(() =>
+        res.destroy(),
+      );
+    } finally {
+      release();
+    }
     return;
   }
   if (req.method !== "POST") return unknown(res);

@@ -48,7 +48,7 @@ test("relinking a legacy project preserves live and stored recording paths and a
     release = resolve;
   });
   const chat = new ChatService(
-    () => projects.directory(project, meeting),
+    () => projects.stateDirectory(project, meeting),
     () => journal,
     () => ({
       info: async () => ({ ready: true, reason: "ready", models: [] }),
@@ -108,7 +108,7 @@ test("relinking a legacy project preserves live and stored recording paths and a
   await ask();
   projects.editProject(project.id, project.name, {}, undefined, "");
   await ask();
-  const workspace = join(base, "projects", project.id, "workspace");
+  const workspace = projects.chatWorkspace(meeting.id);
   assert.deepEqual(scopes, [first, second, workspace]);
   assert.ok((await stat(workspace)).isDirectory());
   await chat.close();
@@ -118,7 +118,12 @@ test("relinking a legacy project preserves live and stored recording paths and a
   const saved = restored.find(meeting.id);
   const originalDirectory = restored.directory(saved.project, saved.meeting);
   assert.equal(new Journal(originalDirectory).time(), 5000);
-  const turns = (await readFile(join(originalDirectory, "chat.jsonl"), "utf8"))
+  const turns = (
+    await readFile(
+      join(restored.stateDirectory(saved.project, saved.meeting), "chat.jsonl"),
+      "utf8",
+    )
+  )
     .trim()
     .split("\n")
     .map((s) => JSON.parse(s));

@@ -54,7 +54,7 @@ test("projects persist independent sessions, defaults and local storage location
   assert.ok(
     repo
       .directory(project, second)
-      .startsWith(join(dir, "MeetingDesk", project.id)),
+      .startsWith(join(dir, "MeetingDesk", project.name)),
   );
 });
 test("legacy mixed recordings migrate to direct playback and remember independent input selections", async (t) => {

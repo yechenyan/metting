@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage } from "node:http";
+import { once } from "node:events";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { resolve, join, sep, extname } from "node:path";
 import { execFile } from "node:child_process";
@@ -28,6 +29,19 @@ import {
   permissionPanes,
 } from "../../modules/speech/capture/permissions.ts";
 
+const port = Number(process.env.MEETING_DESK_PORT || 4317);
+const dev = process.argv.includes("--dev")
+  ? await (
+      await import("vite")
+    ).createServer({
+      server: { middlewareMode: true, hmr: false },
+      appType: "spa",
+    })
+  : null;
+// Reserve the service port before opening or migrating any recording files.
+const server = createServer();
+server.listen(port, "127.0.0.1");
+await once(server, "listening");
 const cmd = promisify(execFile),
   projects = new Projects(dataDir),
   harness = new PiHarness(editorInstructions);
@@ -57,13 +71,12 @@ const meetings = new Meetings(
 const chat = new ChatService(
   (id) => {
     const { project, meeting } = projects.find(id);
-    return projects.directory(project, meeting);
+    return projects.stateDirectory(project, meeting);
   },
   (id) => meetings.journal(id),
   () => new PiHarness(chatInstructions, harness),
   (id) => projects.chatWorkspace(id),
 );
-const port = Number(process.env.MEETING_DESK_PORT || 4317);
 const allowed = new Set(["localhost", "127.0.0.1", "[::1]"]);
 function local(req: IncomingMessage) {
   try {
@@ -81,15 +94,7 @@ const mime: Record<string, string> = {
   ".svg": "image/svg+xml",
   ".woff2": "font/woff2",
 };
-const dev = process.argv.includes("--dev")
-  ? await (
-      await import("vite")
-    ).createServer({
-      server: { middlewareMode: true, hmr: false },
-      appType: "spa",
-    })
-  : null;
-const server = createServer(async (req, res) => {
+server.on("request", async (req, res) => {
   if (!local(req)) {
     res.writeHead(403);
     res.end();
@@ -114,6 +119,7 @@ const server = createServer(async (req, res) => {
         if (area === "bootstrap")
           return json(res, {
             projects: projects.all,
+            defaultRecordingFolder: projects.defaultRoot,
             active: meetings.active,
             features: { chat: true },
           });
@@ -241,9 +247,7 @@ server.on("upgrade", (req, socket, head) => {
     socket.destroy();
   }
 });
-server.listen(port, "127.0.0.1", () =>
-  console.log("Meeting Desk is available at http://127.0.0.1:" + port),
-);
+console.log("Meeting Desk is available at http://127.0.0.1:" + port);
 let closing = false;
 async function close() {
   if (closing) return;

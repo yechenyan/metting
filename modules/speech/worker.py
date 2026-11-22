@@ -231,6 +231,7 @@ def run(args):
         recording = RecordingWriter(
             args.audio_dir or Path(args.profile).parent / "audio",
             lambda error: emit({"kind": "warning", "code": "audioStorageError", "detail": str(error)}),
+            args.recording_name,
         )
         try:
             transcribe_capture(
@@ -261,5 +262,6 @@ if __name__ == "__main__":
     parser.add_argument("--language", choices=MODELS, required=True)
     parser.add_argument("--profile", required=True)
     parser.add_argument("--audio-dir")
+    parser.add_argument("--recording-name", default="Recording")
     parser.add_argument("--offset", type=int, default=0)
     run(parser.parse_args())

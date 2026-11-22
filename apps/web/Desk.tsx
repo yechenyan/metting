@@ -14,12 +14,14 @@ import {
   FolderOpen,
   MessagesSquare,
   PanelLeftOpen,
+  Pencil,
   Plus,
   Settings2,
 } from "lucide-react";
 import { WorkspacePanes } from "./WorkspacePanes";
 import { Sidebar } from "../../modules/projects/ui";
 import { Controls } from "../../modules/meetings/Controls";
+import { RenameRecording } from "../../modules/meetings/RenameRecording";
 import { MeetingNotice } from "../../modules/meetings/Notice";
 import { Timeline } from "../../modules/transcripts/Timeline";
 import { translationTarget } from "../../modules/transcripts/translation";
@@ -27,7 +29,7 @@ import { TranscriptClient, usePart } from "../../modules/transcripts/client";
 import type { Project } from "../../modules/projects/types";
 import { millisecondsPerMinute } from "../../modules/projects/recording-limit";
 import type { Meeting, Settings } from "../../modules/meetings/types";
-import { api, t, recordingName, type Runtime } from "./lib";
+import { api, t, type Runtime } from "./lib";
 import { ChatWorkspace } from "../../modules/chat/Workspace";
 import {
   releaseQuotation,
@@ -79,6 +81,10 @@ export function Desk({
   error: (s: string) => void;
 }) {
   const client = useMemo(() => new TranscriptClient(meeting.id), [meeting.id]);
+  const [renaming, setRenaming] = useState<{
+    projectId: string;
+    meeting: Meeting;
+  } | null>(null);
   const [quotation, setQuotation] = useState<CaptionQuotation | null>(null);
   const clearQuotation = useCallback((quote: CaptionQuotation) => {
     releaseQuotation(quote);
@@ -168,6 +174,7 @@ export function Desk({
             choose={changeMeeting}
             create={createProject}
             add={createMeeting}
+            rename={(projectId, meeting) => setRenaming({ projectId, meeting })}
             adding={addingRecording}
             pi={runtime?.pi || null}
             connect={login}
@@ -218,12 +225,13 @@ export function Desk({
               <ChevronRight size={12} className="path-separator" />
               <select
                 aria-label={t.changeMeeting}
+                title={meeting.name}
                 value={meeting.id}
                 onChange={(e) => changeMeeting(e.target.value)}
               >
-                {project.meetings.map((m, i) => (
+                {project.meetings.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {recordingName(project.meetings.length - i)}
+                    {m.name}
                   </option>
                 ))}
               </select>
@@ -276,6 +284,12 @@ export function Desk({
               <button onClick={editProject}>
                 <Settings2 size={16} />
                 {t.projectSettings}
+              </button>
+              <button
+                onClick={() => setRenaming({ projectId: project.id, meeting })}
+              >
+                <Pencil size={16} />
+                {t.renameRecording}
               </button>
               <button
                 onClick={() =>
@@ -337,6 +351,13 @@ export function Desk({
           />
         </main>
       </WorkspacePanes>
+      {renaming && (
+        <RenameRecording
+          {...renaming}
+          close={() => setRenaming(null)}
+          saved={reload}
+        />
+      )}
     </div>
   );
 }
