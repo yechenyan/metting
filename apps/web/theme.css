@@ -1,0 +1,59 @@
+:root {
+  color-scheme: light;
+  --housing: #f5f5ef;
+  --paper: #f7f8f4;
+  --surface: #fdfdfa;
+  --panel: #ecefe8;
+  --ink: #292e2b;
+  --rail: #363d37;
+  --muted: #626c65;
+  --line: #e2e5dc;
+  --seam: #d3d9cf;
+  --highlight: #fff;
+  --slate: #4c5a68;
+  --olive: #7a7f4e;
+  --ochre: #d2a85e;
+  --oxide: #a8432f;
+  --accent: #d63a2c;
+  --translation-ink: #506057;
+  --danger: #a33629;
+  --sans:
+    "Helvetica Neue", Helvetica, Barlow, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  --mono: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  font: 16px var(--sans);
+  font-synthesis: none;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.livery {
+  flex: none;
+  width: 23px;
+  height: 15px;
+  transform: skewX(-14deg);
+  background: linear-gradient(
+    90deg,
+    var(--slate) 0 21%,
+    transparent 21% 26%,
+    var(--olive) 26% 47%,
+    transparent 47% 52%,
+    var(--ochre) 52% 73%,
+    transparent 73% 78%,
+    var(--oxide) 78%
+  );
+}
+::selection {
+  background: #dce4d6;
+  color: var(--ink);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

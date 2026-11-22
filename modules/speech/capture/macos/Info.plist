@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>MeetingDeskCapture</string>
+<key>CFBundleIdentifier</key><string>local.meetingdesk.capture</string>
+<key>CFBundleName</key><string>Meeting Desk Capture</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>LSUIElement</key><true/>
+<key>NSMicrophoneUsageDescription</key><string>Capture microphone audio for local meeting transcription.</string>
+<key>NSScreenCaptureUsageDescription</key><string>Capture meeting application audio for local transcription.</string>
+</dict></plist>

@@ -1,0 +1,26 @@
+node_modules/
+dist/
+.runtime/
+.sites-runtime/
+__pycache__/
+.DS_Store
+
+# Local model caches, extracted weights and download archives
+.meeting-cache/
+/models/
+/translation/
+vosk-model-*
+sherpa-onnx-pyannote-*
+m2m100-int8/
+ggml-*.bin
+model.bin
+pytorch_model*.bin
+*.onnx
+*.pt
+*.pth
+*.gguf
+*.safetensors
+sentencepiece.bpe.model
+
+# Recordings created when this checkout is selected as a project folder
+/MeetingDesk/
