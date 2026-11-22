@@ -166,7 +166,13 @@ export function Sidebar({
           if (mobile && e.key === "Escape") close();
         }}
       >
-        <div className="side-section">
+        <header className="pane-heading side-section">
+          <span
+            className="livery"
+            role="img"
+            aria-label={t.brand}
+            title={t.brand + " · " + t.brandEnglish}
+          />
           <h2>{t.projects}</h2>
           <button
             title={t.searchProjects}
@@ -184,14 +190,17 @@ export function Sidebar({
             <Plus size={16} />
           </button>
           <button
-            className="mobile-close icon-btn"
+            className="icon-btn"
             ref={closeRef}
             onClick={close}
             aria-label={t.closePanel}
+            title={t.closePanel}
+            aria-controls="projects-panel"
+            aria-expanded={open}
           >
             <PanelLeftClose size={18} />
           </button>
-        </div>
+        </header>
         {search !== null && (
           <input
             className="side-search"

@@ -5,11 +5,13 @@ import {
   type Segment,
 } from "../transcripts/types.ts";
 import type { TranslationTarget } from "../transcripts/translation.ts";
+import type { SpeakerNames } from "../transcripts/speaker-names.ts";
 
 export function validateArrangement(
   proposed: unknown,
   sources: Segment[],
   translationTarget: TranslationTarget,
+  names?: SpeakerNames,
 ): ReadingPlan | undefined {
   if (
     !Array.isArray(proposed) ||
@@ -39,11 +41,13 @@ export function validateArrangement(
     const turn: ReadingTurn = { ids: members.map((s) => s.id) };
     if (members.length > 1) {
       const first = members[0];
+      const firstName = names?.name(first);
       if (
         first.speaker === "unknown" ||
         members.some(
           (s) =>
             s.speaker !== first.speaker ||
+            names?.name(s) !== firstName ||
             s.language !== first.language ||
             mixedSpeakers(s),
         )

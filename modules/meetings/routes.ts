@@ -6,6 +6,7 @@ import type { AgentHarness } from "../agent-runtime/types.ts";
 import { Meetings } from "./service.ts";
 import { audioRoute } from "../audio/routes.ts";
 import { translationTarget } from "../transcripts/translation.ts";
+import { speakerAssignments } from "../transcripts/speaker-names.ts";
 export async function meetingRoute(
   { req, res, id, action }: Route,
   meetings: Meetings,
@@ -75,6 +76,14 @@ export async function meetingRoute(
       )
         meetings.enqueueEditing(id, true);
       return json(res, meeting);
+    }
+    case "speaker-name": {
+      const assignments = speakerAssignments(log.rows, value);
+      log.emit({ kind: "speakerAssignment", assignments });
+      if (log.state === "idle" || log.state === "interrupted")
+        await log.export();
+      else await log.flush();
+      return json(res, { ok: true });
     }
     case "speaker": {
       const name = String(value.name || "")

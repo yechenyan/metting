@@ -71,7 +71,7 @@ export function captureQuotation(
       ids.add(source);
       start = Math.min(start, row.start);
       end = Math.max(end, row.end);
-      speakers.add(nameOf(row.speaker, client.speakers));
+      speakers.add(nameOf(row, client.speakerNames));
     }
     original.push(...originalExcerpts(sourceRows, parts));
     const part = parts.join("\n");

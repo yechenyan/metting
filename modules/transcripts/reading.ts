@@ -5,6 +5,7 @@ import {
   type Segment,
 } from "./types.ts";
 import { translatedText, type TranslationTarget } from "./translation.ts";
+import type { SpeakerNames } from "./speaker-names.ts";
 
 export function turnTranslation(
   turn: ReadingTurn,
@@ -17,6 +18,22 @@ export function turnTranslation(
   return parts.every((s) => !!s)
     ? parts.join(target === "zh" ? "" : " ")
     : undefined;
+}
+
+/** Report the latest completed step for this caption and the selected language. */
+export function captionStatus(
+  row: Segment,
+  target: TranslationTarget,
+  aiTranslation: string | undefined,
+  turn?: ReadingTurn,
+) {
+  if (row.stage !== "final") return row.stage;
+  const reviewed = row.reviewed ?? Boolean(row.edited || turn);
+  if (reviewed) {
+    if (!target || target === row.language) return "reviewed";
+    if (aiTranslation?.trim()) return "translated";
+  }
+  return row.refinement === "fallback" ? "fallback" : "sentence";
 }
 
 export function turnStart(
@@ -70,6 +87,31 @@ export class ReadingLayout {
     for (const member of plan.sourceIds) this.membership.delete(member);
     this.plans.delete(plan.sourceIds[0]);
     return true;
+  }
+  separateSpeakers(rows: ReadonlyMap<string, Segment>, names: SpeakerNames) {
+    let changed = false;
+    for (const plan of this.snapshot()) {
+      let split = false;
+      const turns = plan.turns.flatMap((turn) => {
+        if (turn.ids.length < 2) return [turn];
+        const first = rows.get(turn.ids[0]);
+        const name = first && names.name(first);
+        const conflict =
+          !first ||
+          turn.ids.some((id) => {
+            const row = rows.get(id);
+            return !row || names.name(row) !== name;
+          });
+        if (!conflict) return [turn];
+        split = true;
+        return turn.ids.map((id) => ({ ids: [id] }));
+      });
+      if (split) {
+        this.replace({ ...plan, turns });
+        changed = true;
+      }
+    }
+    return changed;
   }
   changedSource(old: Segment | undefined, row: Segment) {
     if (!old || !this.membership.has(row.id)) return false;

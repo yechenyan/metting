@@ -5,7 +5,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Projects } from "../modules/projects/repository.ts";
 import { Journal } from "../modules/transcripts/journal.ts";
-import { ReadingLayout } from "../modules/transcripts/reading.ts";
+import {
+  captionStatus,
+  ReadingLayout,
+  turnTranslation,
+} from "../modules/transcripts/reading.ts";
+import { translatedText } from "../modules/transcripts/translation.ts";
 import { streamingResult } from "../modules/transcripts/recognition.ts";
 import type { Segment } from "../modules/transcripts/types.ts";
 import { validateArrangement } from "../modules/ai-editing/arrangement.ts";
@@ -47,6 +52,63 @@ test("new sessions inherit translation and migrated sessions keep their saved sw
     reopened.create({ defaults: { editing: false } }).meetings[0].settings
       .translate,
     false,
+  );
+});
+
+test("caption status waits for sentence recognition and the requested AI translation", () => {
+  const row = source("a");
+  for (const stage of ["partial", "stream", "interrupted"] as const) {
+    assert.equal(captionStatus({ ...row, stage }, "zh", undefined), stage);
+  }
+  assert.equal(
+    captionStatus({ ...row, refinement: "fallback" }, "zh", undefined),
+    "fallback",
+  );
+  const reviewed: Segment = {
+    ...row,
+    reviewed: true,
+    translation: "English to French",
+    translationLanguage: "fr",
+    draftTranslation: { source: row.raw, language: "zh", text: "Local draft" },
+  };
+  assert.equal(
+    captionStatus(reviewed, "zh", translatedText(reviewed, "zh")),
+    "sentence",
+  );
+  assert.equal(
+    captionStatus(reviewed, "fr", translatedText(reviewed, "fr")),
+    "translated",
+  );
+  assert.equal(captionStatus(reviewed, null, undefined), "reviewed");
+  assert.equal(captionStatus(reviewed, "en", undefined), "reviewed");
+  const legacy = { ...row, edited: row.raw, translation: "Legacy translation" };
+  assert.equal(
+    captionStatus(legacy, "zh", translatedText(legacy, "zh")),
+    "translated",
+  );
+
+  const turn = { ids: ["a", "b"], text: "Combined speech" };
+  const sources = new Map([
+    ["a", reviewed],
+    ["b", source("b")],
+  ]);
+  assert.equal(
+    captionStatus(reviewed, "fr", turnTranslation(turn, sources, "fr"), turn),
+    "sentence",
+  );
+  const complete = {
+    ...turn,
+    translation: "Combined translation",
+    translationLanguage: "fr" as const,
+  };
+  assert.equal(
+    captionStatus(
+      reviewed,
+      "fr",
+      turnTranslation(complete, sources, "fr"),
+      complete,
+    ),
+    "translated",
   );
 });
 

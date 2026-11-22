@@ -2,6 +2,7 @@ import type { Language, Source, SpeakerSpan } from "../speech/types.ts";
 import type { RunState, Notice } from "../meetings/types.ts";
 import type { Usage } from "../agent-runtime/types.ts";
 import type { Draft, Translated } from "./translation.ts";
+import type { SpeakerAssignment } from "./speaker-names.ts";
 export interface Segment extends Translated, Draft {
   id: string;
   start: number;
@@ -48,6 +49,7 @@ export interface Snapshot {
   segments: Segment[];
   reading?: ReadingPlan[];
   speakers: Record<string, string>;
+  speakerAssignments?: SpeakerAssignment[];
   usage: Usage;
   state: RunState;
   elapsed: number;
@@ -60,6 +62,7 @@ export type Change =
   | { kind: "revision"; segments: Segment[]; plan?: ReadingPlan }
   | { kind: "remove"; id: string }
   | { kind: "speaker"; id: string; name: string }
+  | { kind: "speakerAssignment"; assignments: SpeakerAssignment[] }
   | { kind: "state"; state: RunState; elapsed: number; notice: Notice | null }
   | { kind: "usage"; usage: Usage }
   | { kind: "ai"; status: string }

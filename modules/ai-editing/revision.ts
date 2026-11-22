@@ -99,6 +99,7 @@ export function applyRevision(
         reply.turns,
         candidates,
         ctx.translationTarget,
+        journal.speakerNames,
       );
   }
   if (segments.length) journal.emit({ kind: "revision", segments, plan });

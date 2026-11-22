@@ -125,8 +125,23 @@
   "overlap": "重叠发言",
   "renameSpeaker": "命名发言人",
   "speakerName": "显示名称",
-  "speakerHint": "同一次听写中，这位发言人的记录会同步更新。",
+  "speakerMatchFollowing": "后续同一发言人自动使用此姓名",
+  "speakerMatchHint": "在本次录音中，从这段发言开始按声音匹配。",
+  "speakerOnlyHint": "只修改选中的这段发言。",
+  "speakerUnconfirmedHint": "先为这段发言命名，确认是单人发言后，自动匹配本次录音中后续相同的声音。",
+  "speakerChooseSpan": "展开发言区间，选择要命名的发言人。",
+  "speakerPassageChanged": "这段发言的说话人已更新，请重新选择。",
   "speakerTurns": "发言区间",
+  "speakerTurnsHint": "这里列出每位发言人在录音中的开始和结束时间。多人同时说话的时段会标为「重叠发言」。",
+  "captionStatus": {
+    "partial": "即时听写",
+    "stream": "即时稿，等待整句复听",
+    "interrupted": "中断前的即时稿",
+    "fallback": "即时稿，整句复听未完成",
+    "sentence": "整句识别完成",
+    "reviewed": "AI 已整理发言",
+    "translated": "AI 已整理发言并完成翻译"
+  },
   "runStates": {
     "idle": "就绪",
     "preparing": "准备中",
@@ -134,15 +149,7 @@
     "stopping": "保存中",
     "interrupted": "已恢复"
   },
-  "stages": {
-    "partial": "即时",
-    "stream": "复听中",
-    "final": "原句",
-    "interrupted": "中断前草稿"
-  },
-  "revised": "已修订",
   "merged": "已合并",
-  "streamOnly": "即时稿",
   "sentenceDetails": "听写对照",
   "levelLive": "即时听写",
   "levelSentence": "整句复听",

@@ -9,6 +9,7 @@ import {
   type ReadingPlan,
 } from "./types.ts";
 import { ReadingLayout } from "./reading.ts";
+import { SpeakerNames } from "./speaker-names.ts";
 import { retainDraft } from "./drafts.ts";
 import {
   countSourceWords,
@@ -23,7 +24,8 @@ export class TranscriptClient {
   rows = new Map<string, Segment>();
   reading = new ReadingLayout();
   readingVersion = 0;
-  speakers: Record<string, string> = {};
+  speakerNames = new SpeakerNames();
+  speakerVersion = 0;
   usage = emptyUsage();
   levels = [0, 0];
   runningTokens = 0;
@@ -91,7 +93,8 @@ export class TranscriptClient {
     );
     this.reading = new ReadingLayout(s.reading);
     this.readingVersion++;
-    this.speakers = s.speakers;
+    this.speakerNames = new SpeakerNames(s.speakers, s.speakerAssignments);
+    this.speakerVersion++;
     this.usage = s.usage;
     this.ai = s.aiStatus;
     this.runningTokens = 0;
@@ -107,11 +110,17 @@ export class TranscriptClient {
   private storeRows(rows: Segment[], plan?: ReadingPlan) {
     const oldIds = this.ids;
     let layoutChanged = false;
+    let namesChanged = false;
     for (const incoming of rows) {
       const previous = this.rows.get(incoming.id);
       const r = this.receivedRow(incoming, previous);
       if (this.reading.changedSource(previous, r)) layoutChanged = true;
       this.rows.set(r.id, r);
+      const confirmed = this.speakerNames.confirm(r);
+      if (confirmed) {
+        this.speakerNames.apply([confirmed]);
+        namesChanged = true;
+      }
       if (!previous || previous.start !== r.start) {
         const ids = previous ? this.ids.filter((id) => id !== r.id) : this.ids;
         const last = this.rows.get(ids.at(-1) || "");
@@ -125,6 +134,12 @@ export class TranscriptClient {
       }
     }
     if (plan && this.reading.replace(plan)) layoutChanged = true;
+    if (namesChanged) {
+      if (this.reading.separateSpeakers(this.rows, this.speakerNames))
+        layoutChanged = true;
+      this.speakerVersion++;
+      this.ping("speakers");
+    }
     if (layoutChanged) this.readingVersion++;
     if (this.ids !== oldIds) this.ping("ids");
     if (layoutChanged) this.ping("reading");
@@ -150,7 +165,14 @@ export class TranscriptClient {
         break;
       }
       case "speaker":
-        this.speakers = { ...this.speakers, [c.id]: c.name };
+      case "speakerAssignment":
+        if (c.kind === "speaker") this.speakerNames.legacy[c.id] = c.name;
+        else this.speakerNames.apply(c.assignments);
+        if (this.reading.separateSpeakers(this.rows, this.speakerNames)) {
+          this.readingVersion++;
+          this.ping("reading");
+        }
+        this.speakerVersion++;
         this.ping("speakers");
         break;
       case "state":

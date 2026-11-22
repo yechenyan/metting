@@ -19,6 +19,7 @@ import { captureFailure } from "../speech/capture/permissions.ts";
 import { retainRecognition } from "./recognition.ts";
 import { draftScope, retainDraft } from "./drafts.ts";
 import { ReadingLayout, turnStart, turnTranslation } from "./reading.ts";
+import { SpeakerNames, type SpeakerAssignment } from "./speaker-names.ts";
 import {
   defaultTranslationLanguage,
   draftText,
@@ -32,7 +33,8 @@ export class Journal {
   private recent: (Packet | undefined)[] = new Array(512);
   readonly rows = new Map<string, Segment>();
   readonly reading = new ReadingLayout();
-  readonly names: Record<string, string> = Object.create(null);
+  readonly speakerNames = new SpeakerNames();
+  readonly names = this.speakerNames.legacy;
   readonly listeners = new Set<(p: Packet) => void>();
   readonly path: string;
   readonly markdown: string;
@@ -95,6 +97,23 @@ export class Journal {
       this.speakerVersions.get(row.speaker) ?? 0,
     );
   }
+  private assignSpeakers(assignments: SpeakerAssignment[], seq: number) {
+    const voices = new Set(assignments.map((entry) => entry.speaker));
+    const selected = new Set(assignments.map((entry) => entry.id));
+    const previous = new Map<Segment, string | undefined>();
+    for (const row of this.rows.values()) {
+      if (voices.has(row.speaker) || selected.has(row.id))
+        previous.set(row, this.speakerNames.name(row));
+    }
+    this.speakerNames.apply(assignments);
+    for (const [row, name] of previous) {
+      if (this.speakerNames.name(row) !== name) {
+        this.rawVersions.set(row.id, seq);
+        this.rawCursor = Math.max(this.rawCursor, seq);
+      }
+    }
+    this.reading.separateSpeakers(this.rows, this.speakerNames);
+  }
   private storeSegment(row: Segment, seq: number) {
     const before = this.rows.get(row.id);
     const saved = retainDraft(retainRecognition(row, this.rows), before);
@@ -110,6 +129,8 @@ export class Journal {
     }
     this.reading.changedSource(before, saved);
     this.rows.set(saved.id, saved);
+    const confirmed = this.speakerNames.confirm(saved);
+    if (confirmed) this.assignSpeakers([confirmed], seq);
     return saved;
   }
   private apply(c: Change, seq: number): Change {
@@ -136,6 +157,10 @@ export class Journal {
           this.rawCursor = Math.max(this.rawCursor, seq);
         }
         this.names[c.id] = c.name;
+        this.reading.separateSpeakers(this.rows, this.speakerNames);
+        break;
+      case "speakerAssignment":
+        this.assignSpeakers(c.assignments, seq);
         break;
       case "usage":
         this.usage = c.usage;
@@ -162,6 +187,7 @@ export class Journal {
       segments: [...this.rows.values()].sort(chronological),
       reading: this.reading.snapshot(),
       speakers: this.names,
+      speakerAssignments: this.speakerNames.snapshot(),
       usage: this.usage,
       state: this.state,
       elapsed: this.time(),
@@ -322,7 +348,7 @@ export class Journal {
     for (const id of this.reading.order(ids)) {
       const s = this.rows.get(id)!;
       const turn = this.reading.turn(id);
-      const name = this.names[s.speaker] || s.speaker;
+      const name = this.speakerNames.name(s) || s.speaker;
       lines.push(
         "## " + time(turnStart(s, turn, this.rows)) + " · " + name,
         "",
@@ -364,7 +390,7 @@ export class Journal {
         for (const p of s.spans)
           lines.push(
             "- " +
-              (this.names[p.speaker] || p.speaker) +
+              (this.speakerNames.name(s, p.speaker) || p.speaker) +
               " · " +
               (p.start / 1000).toFixed(1) +
               "–" +

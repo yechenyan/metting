@@ -4,7 +4,7 @@ import { clock, nameOf, t } from "../../apps/web/lib";
 import { TranscriptClient, usePart } from "./client";
 import { streamingResult } from "./recognition";
 import { draftScope } from "./drafts";
-import { turnTranslation } from "./reading";
+import { captionStatus, turnTranslation } from "./reading";
 import {
   draftText,
   translatedText,
@@ -26,7 +26,7 @@ function SourceVersions({
   playback: SentencePlayback;
 }) {
   const row = usePart(client, id, () => client.rows.get(id));
-  const names = usePart(client, "speakers", () => client.speakers);
+  usePart(client, "speakers", () => client.speakerVersion);
   const ai = usePart(client, "ai", () => client.ai);
   const run = usePart(client, "state", () => client.state.value);
   if (!row) return <p className="muted">{t.sourceUnavailable}</p>;
@@ -53,7 +53,7 @@ function SourceVersions({
   return (
     <section className="source-versions">
       <h3>
-        {nameOf(row.speaker, names)}{" "}
+        {nameOf(row, client.speakerNames)}{" "}
         <SentenceAudio
           ids={[id]}
           time={row.start}
@@ -62,6 +62,9 @@ function SourceVersions({
         />
         <time>–{clock(row.end)}</time>
         {row.captureSource && <small> · {t[row.captureSource]}</small>}
+        <small className="version-status">
+          {t.captionStatus[captionStatus(row, target, translation)]}
+        </small>
       </h3>
       <dl className="version-list">
         <dt>{t.levelLive}</dt>

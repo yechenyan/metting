@@ -8,15 +8,15 @@ import {
   useState,
 } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { AudioLines, ChevronsDown, Pencil, ChevronDown } from "lucide-react";
+import { AudioLines, ChevronsDown, ChevronDown } from "lucide-react";
 import { TranscriptClient, usePart } from "./client";
-import { t, clock, nameOf, api } from "../../apps/web/lib";
-import { Modal } from "../../apps/web/Modal";
+import { t, clock, nameOf } from "../../apps/web/lib";
 import { UsagePanel } from "../agent-runtime/Usage";
 import { SentenceDetails } from "./SentenceDetails";
+import { SpeakerDialog, type SpeakerSelection } from "./SpeakerDialog";
 import { draftScope } from "./drafts";
-import { turnStart, turnTranslation } from "./reading";
-import type { ReadingTurn } from "./types";
+import { captionStatus, turnStart, turnTranslation } from "./reading";
+import { mixedSpeakers, type ReadingTurn } from "./types";
 import {
   draftText,
   translatedText,
@@ -77,28 +77,31 @@ const Row = memo(function Row({
   raw: boolean;
   target: TranslationTarget;
   view: CaptionView;
-  rename: (s: string) => void;
+  rename: (selection: SpeakerSelection) => void;
   inspect: (id: string) => void;
   turn?: ReadingTurn;
   playback: SentencePlayback;
 }) {
-  const row = usePart(client, id, () => client.rows.get(id)),
-    names = usePart(client, "speakers", () => client.speakers);
+  const row = usePart(client, id, () => client.rows.get(id));
+  usePart(client, "speakers", () => client.speakerVersion);
   if (!row) return null;
-  const multiple =
-    row.spans &&
-    (new Set(row.spans.map((s) => s.speaker)).size > 1 ||
-      row.spans.some((s) => s.overlap));
+  const multiple = mixedSpeakers(row);
   const speaker = row.speaker;
+  const displayName = nameOf(row, client.speakerNames);
   const merged = turn && turn.ids.length > 1;
   const source = turn?.text || (!raw && row.edited) || row.raw;
   const sameLanguage = row.language === target;
-  const finalTranslation =
-    view !== "source" &&
-    !sameLanguage &&
-    (turn
-      ? turnTranslation(turn, client.rows, target)
-      : translatedText(row, target));
+  const aiTranslation =
+    target && !sameLanguage
+      ? turn
+        ? turnTranslation(turn, client.rows, target)
+        : translatedText(row, target)
+      : undefined;
+  const status = captionStatus(row, target, aiTranslation, turn);
+  const statusLabel = merged
+    ? t.captionStatus[status] + " · " + t.merged
+    : t.captionStatus[status];
+  const finalTranslation = view !== "source" && aiTranslation;
   const draft =
     !merged &&
     !sameLanguage &&
@@ -114,37 +117,23 @@ const Row = memo(function Row({
     >
       <div className="utterance-meta">
         <div className="speaker-line">
+          <span
+            className="caption-status"
+            data-status={status}
+            role="img"
+            aria-label={statusLabel}
+            title={statusLabel}
+          />
           <button
-            className={
-              "speaker-tag color-" + (parseInt(speaker.slice(1), 10) % 4 || 0)
-            }
-            onClick={() => rename(speaker)}
-            disabled={speaker === "unknown"}
-            title={nameOf(speaker, names)}
+            className="speaker-tag"
+            onClick={() => rename({ ids: turn?.ids ?? [id], speaker })}
+            disabled={multiple}
+            title={multiple ? t.speakerChooseSpan : displayName}
           >
             <span>
-              {row.spans?.some((s) => s.overlap)
-                ? t.overlap
-                : nameOf(speaker, names)}
+              {row.spans?.some((s) => s.overlap) ? t.overlap : displayName}
             </span>
           </button>
-          <span
-            className="stage-tag"
-            data-settled={
-              (row.stage === "final" &&
-                !merged &&
-                row.refinement !== "fallback") ||
-              undefined
-            }
-          >
-            {merged
-              ? t.merged
-              : row.edited && !raw
-                ? t.revised
-                : row.refinement === "fallback"
-                  ? t.streamOnly
-                  : t.stages[row.stage]}
-          </span>
         </div>
         <div className="caption-tools">
           <SentenceAudio
@@ -196,10 +185,11 @@ const Row = memo(function Row({
       </button>
       {multiple && (
         <details className="turns">
-          <summary>
+          <summary title={t.speakerTurnsHint}>
             {t.speakerTurns}
             <ChevronDown size={12} />
           </summary>
+          <p>{t.speakerTurnsHint}</p>
           {row.spans!.map((s, i) => (
             <div key={i}>
               <time>
@@ -207,9 +197,9 @@ const Row = memo(function Row({
               </time>
               <button
                 disabled={s.speaker === "unknown"}
-                onClick={() => rename(s.speaker)}
+                onClick={() => rename({ ids: [id], speaker: s.speaker })}
               >
-                {nameOf(s.speaker, names)}
+                {nameOf(row, client.speakerNames, s.speaker)}
               </button>
               {s.overlap && <span>{t.overlap}</span>}
             </div>
@@ -252,9 +242,7 @@ export function Timeline({
     [audio, playing, play],
   );
   const [raw, setRaw] = useState(false),
-    [renaming, setRenaming] = useState(""),
-    [name, setName] = useState(""),
-    [error, setError] = useState(""),
+    [renaming, setRenaming] = useState<SpeakerSelection | null>(null),
     [selected, setSelected] = useState("");
   const preference = "meeting.desk.captionView." + client.meeting;
   const [chosenView, setChosenView] = useState<CaptionView>(() => {
@@ -297,14 +285,6 @@ export function Timeline({
     sticky.current = true;
     setFollowing(true);
   }, [client]);
-  const rename = useCallback(
-    (s: string) => {
-      setRenaming(s);
-      setName(nameOf(s, client.speakers));
-      setError("");
-    },
-    [client],
-  );
   return (
     <section className="transcript-card" aria-label={t.liveTranscript}>
       <div className="quotation-host" ref={quoteHost} />
@@ -338,7 +318,7 @@ export function Timeline({
                     raw={raw}
                     target={target}
                     view={view}
-                    rename={rename}
+                    rename={setRenaming}
                     inspect={setSelected}
                     turn={raw ? undefined : client.reading.turn(ids[r.index])}
                   />
@@ -432,42 +412,11 @@ export function Timeline({
         />
       )}
       {renaming && (
-        <Modal title={t.renameSpeaker} close={() => setRenaming("")}>
-          <form
-            className="form"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              try {
-                await api("meetings/" + client.meeting + "/speaker", {
-                  speaker: renaming,
-                  name,
-                });
-                setRenaming("");
-              } catch (e) {
-                setError(String(e));
-              }
-            }}
-          >
-            <label>
-              {t.speakerName}
-              <input
-                autoFocus
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={64}
-              />
-            </label>
-            <p className="muted">{t.speakerHint}</p>
-            {error && <p className="error">{error}</p>}
-            <footer>
-              <button className="button primary">
-                <Pencil size={15} />
-                {t.save}
-              </button>
-            </footer>
-          </form>
-        </Modal>
+        <SpeakerDialog
+          client={client}
+          selection={renaming}
+          close={() => setRenaming(null)}
+        />
       )}
     </section>
   );

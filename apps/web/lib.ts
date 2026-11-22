@@ -1,5 +1,7 @@
 import type { AgentInfo } from "../../modules/agent-runtime/types";
 import type { SpeechInfo } from "../../modules/speech/types";
+import type { Segment } from "../../modules/transcripts/types";
+import type { SpeakerNames } from "../../modules/transcripts/speaker-names";
 export interface Runtime {
   pi: AgentInfo;
   speech: SpeechInfo;
@@ -41,8 +43,13 @@ export function clock(ms: number, full = false) {
   if (full || s >= 3600) parts.unshift(Math.floor(s / 3600));
   return parts.map((n) => String(n).padStart(2, "0")).join(":");
 }
-export function nameOf(s: string, names: Record<string, string>) {
+export function nameOf(
+  row: Segment,
+  names: SpeakerNames,
+  speaker = row.speaker,
+) {
   return (
-    names[s] || (s === "unknown" ? t.unknown : t.speaker + " " + s.slice(1))
+    names.name(row, speaker) ||
+    (speaker === "unknown" ? t.unknown : t.speaker + " " + speaker.slice(1))
   );
 }

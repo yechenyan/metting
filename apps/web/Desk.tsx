@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ChevronRight,
   CircleAlert,
@@ -6,7 +13,6 @@ import {
   Ellipsis,
   FolderOpen,
   MessagesSquare,
-  PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Settings2,
@@ -116,13 +122,21 @@ export function Desk({
 
   const actions = useRef<HTMLDivElement>(null);
   const sidebarToggle = useRef<HTMLButtonElement>(null);
-  const drawerClose = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!mobileDrawer) return;
-    drawerClose.current?.focus();
-    const toggle = sidebarToggle.current;
-    return () => toggle?.focus();
-  }, [mobileDrawer]);
+  const projectClose = useRef<HTMLButtonElement>(null);
+  const projectFocusPending = useRef(false);
+  const projectsDocked = sidebarOpen && !mobileDrawer;
+  function showProjects(open: boolean) {
+    projectFocusPending.current = true;
+    setSidebar(open);
+  }
+  useLayoutEffect(() => {
+    if (projectFocusPending.current || mobileDrawer) {
+      const target = sidebarOpen ? projectClose : sidebarToggle;
+      target.current?.focus({ preventScroll: true });
+    }
+    // Selecting a recording can also dismiss the mobile drawer.
+    projectFocusPending.current = mobileDrawer;
+  }, [sidebarOpen, mobileDrawer]);
 
   const notice = state.notice;
   const relevantNotice =
@@ -142,121 +156,8 @@ export function Desk({
 
   return (
     <div className="app-shell">
-      <header className="desk-nav" inert={mobileDrawer}>
-        <div className="desk-brand">
-          <span className="livery" aria-hidden="true" />
-          <strong>{t.brand}</strong>
-          <span className="brand-english" lang="en">
-            {t.brandEnglish}
-          </span>
-        </div>
-        <button
-          className="icon-btn sidebar-toggle"
-          ref={sidebarToggle}
-          aria-label={sidebarOpen ? t.closePanel : t.openProjects}
-          title={sidebarOpen ? t.closePanel : t.openProjects}
-          aria-controls="projects-panel"
-          aria-expanded={sidebarOpen}
-          onClick={() => setSidebar(!sidebarOpen)}
-        >
-          {sidebarOpen ? (
-            <PanelLeftClose size={17} />
-          ) : (
-            <PanelLeftOpen size={17} />
-          )}
-        </button>
-        <div className="desk-path">
-          <h1 title={project.name}>{project.name}</h1>
-          <ChevronRight size={12} className="path-separator" />
-          <select
-            aria-label={t.changeMeeting}
-            value={meeting.id}
-            onChange={(e) => changeMeeting(e.target.value)}
-          >
-            {project.meetings.map((m, i) => (
-              <option key={m.id} value={m.id}>
-                {recordingName(project.meetings.length - i)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <Controls
-          client={client}
-          meeting={meeting}
-          maxRecordingMinutes={project.maxRecordingMinutes}
-          pi={runtime?.pi || null}
-          activeOther={!!activeId && activeId !== meeting.id}
-          change={change}
-          onActive={reload}
-          error={error}
-          login={login}
-        />
-        {!chatOpen && (
-          <button
-            ref={chatToggle}
-            className={replyWaiting ? "chat-reply-link" : "icon-btn"}
-            onClick={() => showChat(true)}
-            aria-label={replyWaiting ? t.viewChatReply : t.openChat}
-            title={replyWaiting ? t.viewChatReply : t.openChat}
-            aria-haspopup={compactChat ? "dialog" : undefined}
-          >
-            <MessagesSquare size={17} />
-            {replyWaiting && <span>{t.viewChatReply}</span>}
-          </button>
-        )}
-        <button
-          className="icon-btn"
-          popoverTarget="session-actions"
-          onClick={(e) => {
-            const button = e.currentTarget.getBoundingClientRect();
-            const menu = actions.current;
-            menu?.style.setProperty("--actions-top", button.bottom + 4 + "px");
-            menu?.style.setProperty(
-              "--actions-right",
-              document.documentElement.clientWidth - button.right + "px",
-            );
-          }}
-          aria-label={t.moreActions}
-          title={t.moreActions}
-        >
-          <Ellipsis size={19} />
-        </button>
-        <div
-          id="session-actions"
-          className="session-actions"
-          popover="auto"
-          ref={actions}
-          onClick={() => actions.current?.hidePopover()}
-        >
-          <button
-            disabled={addingRecording}
-            onClick={() => createMeeting(project.id)}
-          >
-            <Plus size={16} />
-            {t.newMeeting}
-          </button>
-          <button onClick={editProject}>
-            <Settings2 size={16} />
-            {t.projectSettings}
-          </button>
-          <button
-            onClick={() =>
-              void api("meetings/" + meeting.id + "/reveal", {}).catch((e) =>
-                error(String(e)),
-              )
-            }
-          >
-            <FolderOpen size={16} />
-            {t.reveal}
-          </button>
-          <a href={"/api/meetings/" + meeting.id + "/export"} download>
-            <Download size={16} />
-            {t.export}
-          </a>
-        </div>
-      </header>
       <WorkspacePanes
-        projectsDocked={sidebarOpen && !mobileDrawer}
+        projectsDocked={projectsDocked}
         chatDocked={chatOpen && !compactChat}
         projects={
           <Sidebar
@@ -272,8 +173,8 @@ export function Desk({
             connect={login}
             open={sidebarOpen}
             mobile={mobileDrawer}
-            closeRef={drawerClose}
-            close={() => setSidebar(false)}
+            closeRef={projectClose}
+            close={() => showProjects(false)}
           />
         }
         chat={
@@ -298,6 +199,115 @@ export function Desk({
         }
       >
         <main className="main" inert={mobileDrawer}>
+          <header className="pane-heading desk-nav" aria-label={t.meetings}>
+            {!projectsDocked && (
+              <button
+                className="icon-btn sidebar-toggle"
+                ref={sidebarToggle}
+                aria-label={t.openProjects}
+                title={t.openProjects}
+                aria-controls="projects-panel"
+                aria-expanded={sidebarOpen}
+                onClick={() => showProjects(true)}
+              >
+                <PanelLeftOpen size={17} />
+              </button>
+            )}
+            <div className="desk-path">
+              <h1 title={project.name}>{project.name}</h1>
+              <ChevronRight size={12} className="path-separator" />
+              <select
+                aria-label={t.changeMeeting}
+                value={meeting.id}
+                onChange={(e) => changeMeeting(e.target.value)}
+              >
+                {project.meetings.map((m, i) => (
+                  <option key={m.id} value={m.id}>
+                    {recordingName(project.meetings.length - i)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Controls
+              client={client}
+              meeting={meeting}
+              maxRecordingMinutes={project.maxRecordingMinutes}
+              pi={runtime?.pi || null}
+              activeOther={!!activeId && activeId !== meeting.id}
+              change={change}
+              onActive={reload}
+              error={error}
+              login={login}
+            />
+            <button
+              className="icon-btn"
+              popoverTarget="session-actions"
+              onClick={(e) => {
+                const button = e.currentTarget.getBoundingClientRect();
+                const menu = actions.current;
+                menu?.style.setProperty(
+                  "--actions-top",
+                  button.bottom + 4 + "px",
+                );
+                menu?.style.setProperty(
+                  "--actions-right",
+                  document.documentElement.clientWidth - button.right + "px",
+                );
+              }}
+              aria-label={t.moreActions}
+              title={t.moreActions}
+            >
+              <Ellipsis size={19} />
+            </button>
+            <div
+              id="session-actions"
+              className="session-actions"
+              popover="auto"
+              ref={actions}
+              onClick={() => actions.current?.hidePopover()}
+            >
+              <button
+                disabled={addingRecording}
+                onClick={() => createMeeting(project.id)}
+              >
+                <Plus size={16} />
+                {t.newMeeting}
+              </button>
+              <button onClick={editProject}>
+                <Settings2 size={16} />
+                {t.projectSettings}
+              </button>
+              <button
+                onClick={() =>
+                  void api("meetings/" + meeting.id + "/reveal", {}).catch(
+                    (e) => error(String(e)),
+                  )
+                }
+              >
+                <FolderOpen size={16} />
+                {t.reveal}
+              </button>
+              <a href={"/api/meetings/" + meeting.id + "/export"} download>
+                <Download size={16} />
+                {t.export}
+              </a>
+            </div>
+            {!chatOpen && (
+              <button
+                ref={chatToggle}
+                className={replyWaiting ? "chat-reply-link" : "icon-btn"}
+                onClick={() => showChat(true)}
+                aria-label={replyWaiting ? t.viewChatReply : t.openChat}
+                title={replyWaiting ? t.viewChatReply : t.openChat}
+                aria-controls="chat-panel"
+                aria-expanded={chatOpen}
+                aria-haspopup={compactChat ? "dialog" : undefined}
+              >
+                <MessagesSquare size={17} />
+                {replyWaiting && <span>{t.viewChatReply}</span>}
+              </button>
+            )}
+          </header>
           {runtime?.speech.ready === false && (
             <div className="notice" role="status">
               <CircleAlert size={15} />

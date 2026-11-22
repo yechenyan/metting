@@ -73,7 +73,7 @@ export function nextBatch(job: EditingJob, reserved: Set<string>) {
   const context = makeContext(
     rows.slice(Math.max(0, end - 12), end),
     target.id,
-    journal.names,
+    journal.speakerNames,
     lang,
     journal.reading,
     ids,

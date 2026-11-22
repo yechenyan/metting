@@ -45,7 +45,7 @@
 .sentence-play[aria-pressed="true"] {
   background: var(--panel);
 }
-.caption-tools:has(.sentence-play) {
-  flex-wrap: wrap;
-  column-gap: 3px;
+.caption-tools .sentence-play {
+  gap: 2px;
+  padding: 1px 0;
 }

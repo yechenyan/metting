@@ -266,16 +266,50 @@ function ActiveChat({
     <>
       {open && (
         <Panel compact={compact} close={() => setOpen(false)}>
-          <header className="chat-head">
+          <header className="pane-heading chat-head">
             <h2>{t.chatTitle}</h2>
+            <nav className="chat-thread-picker" aria-label={t.chatThread}>
+              <label className="chat-thread-select">
+                <select
+                  aria-label={t.chatThread}
+                  value={threadId}
+                  disabled={threads.creating}
+                  onFocus={() => void threads.refresh()}
+                  onChange={(e) => threads.choose(e.target.value)}
+                >
+                  {threads.threads.map((thread, index) => (
+                    <option key={thread.id} value={thread.id}>
+                      {thread.title ||
+                        (index === 0
+                          ? t.defaultChatThread
+                          : t.numberedChatThread.replace(
+                              "{number}",
+                              String(index + 1),
+                            ))}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={12} aria-hidden="true" />
+              </label>
+              <button
+                type="button"
+                className="small-icon"
+                aria-label={t.newChatThread}
+                title={t.newChatThread}
+                onClick={() => void threads.create()}
+                disabled={threads.creating}
+              >
+                <Plus size={16} />
+              </button>
+            </nav>
             <button
               type="button"
-              className="chat-folder"
+              className="icon-btn chat-folder"
               onClick={editProject}
               title={folderTitle}
               aria-label={folderTitle}
             >
-              <FolderOpen size={13} />
+              <FolderOpen size={15} />
               <span>
                 {projectFolder.split("/").filter(Boolean).at(-1) ||
                   t.projectFolder}
@@ -290,38 +324,6 @@ function ActiveChat({
               <PanelRightClose size={16} />
             </button>
           </header>
-          <nav className="chat-thread-picker" aria-label={t.chatThread}>
-            <label className="chat-thread-select">
-              <select
-                aria-label={t.chatThread}
-                value={threadId}
-                disabled={threads.creating}
-                onFocus={() => void threads.refresh()}
-                onChange={(e) => threads.choose(e.target.value)}
-              >
-                {threads.threads.map((thread, index) => (
-                  <option key={thread.id} value={thread.id}>
-                    {thread.title ||
-                      (index === 0
-                        ? t.defaultChatThread
-                        : t.numberedChatThread.replace(
-                            "{number}",
-                            String(index + 1),
-                          ))}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={12} aria-hidden="true" />
-            </label>
-            <button
-              type="button"
-              onClick={() => void threads.create()}
-              disabled={threads.creating}
-            >
-              <Plus size={13} />
-              {t.newChatThread}
-            </button>
-          </nav>
           {threads.error && (
             <p className="error chat-thread-error" role="alert">
               {threads.error}

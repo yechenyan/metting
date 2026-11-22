@@ -5,7 +5,7 @@ export type TranscriptSource = Pick<
   Journal,
   "rows" | "names" | "rawCursor" | "rawChangedAt"
 > &
-  Partial<Pick<Journal, "flush">>;
+  Partial<Pick<Journal, "flush" | "speakerNames">>;
 
 export interface RawPassage {
   id: string;
@@ -37,6 +37,7 @@ export function snapshotTranscript(
     end: row.end,
     raw: row.raw,
     speaker:
+      source.speakerNames?.name(row) ||
       source.names[row.speaker] ||
       row.speaker.replace(/^[Sp](\d+)$/, "Speaker $1"),
     changedAt: source.rawChangedAt(row),

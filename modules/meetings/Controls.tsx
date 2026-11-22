@@ -110,6 +110,13 @@ export function Controls({
     exhausted =
       !active && state.elapsed >= maxRecordingMinutes * millisecondsPerMinute,
     cfg = meeting.settings;
+  const localNotice =
+    cfg.localTranslation !== false &&
+    cfg.translate &&
+    cfg.language !== cfg.translationLanguage &&
+    (local.state === "downloading" || local.state === "failed")
+      ? t.localStates[local.state]
+      : undefined;
   const inputs = useAudioSources(cfg, active);
   const selectedModel =
     pi?.models.find((m) => m.id === cfg.model) || pi?.models[0];
@@ -188,14 +195,6 @@ export function Controls({
           </div>
         )}
         <Duration client={client} limitMinutes={maxRecordingMinutes} />
-        {cfg.localTranslation !== false &&
-          cfg.translate &&
-          cfg.language !== cfg.translationLanguage &&
-          (local.state === "downloading" || local.state === "failed") && (
-            <button className="local-status" onClick={() => setOptions(true)}>
-              {t.localStates[local.state]}
-            </button>
-          )}
         <span className="sr-only" role="status">
           {t.runStates[state.value]}
         </span>
@@ -237,11 +236,14 @@ export function Controls({
         </button>
         <button
           className="icon-btn controls-settings"
-          title={t.settings}
+          data-notice={localNotice ? "" : undefined}
+          title={localNotice ? t.settings + " · " + localNotice : t.settings}
           aria-label={t.settings}
+          aria-description={localNotice}
           onClick={() => setOptions(true)}
         >
           <SlidersHorizontal size={16} />
+          {localNotice && <span className="local-status">{localNotice}</span>}
         </button>
       </div>
       {options && (
